@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# This is a script that fixes issues with having access a mix of microk8s clusters
+# (which require the use of the microk8s.kubectl command),
+# vs real Kubernetes clusters that should only use the real "kubectl" command,
+# via the IntelliJ Kubernetes plugin for JetBrains IDEs.
+
+# It can also be extended to use different version of the "kubectl" command
+# if that is required across different K8s clusters on different versions.
+
+# When this script references a version of kubectl. It should alway reference
+# it along a explicit path the ensure the proper version is used.
+
+# set -x
+
+# Place your pqth to the gcloud instulation.
+# This should also be where GKE kubectl is installed.
+# Best to install the latest gcloud via gooles instruactions.
+gcloud_path=/home/$USER/Software/Google/gcloud-cli/google-cloud-sdk/bin
+# This is a regex patter that identifies your microk8s clusters via the
+# --context parameter that the plugin should always fill in.
+# The microk8s cluster rely on using the microk8s.kubectl command.
+microk8s_ctx="microk8s"
+# This is a regex patter that identifies you gke or other "real" Kubernetes
+# clusters that reqqire the "kubectl" command. 
+gke_ctx="gke_"
+
+# echo -n `date`": " >> /tmp/kubectl.log
+# echo $PATH >> /tmp/kubectl.log
+# echo `echo $ENV | grep -P (KUBE|localhost|127\.)` >> /tmp/kubectl.log
+# echo "Params: [ $@ ]" >> /tmp/kubectl.log
+
+ctx_str="--context"
+
+has_ctx=`echo "$@" | grep -- ${ctx_str}`
+if [ -z "${has_ctx}" ]; then
+    # echo "==============================================="  >> /tmp/kubectl.log
+    # echo "my kubectl script: --context is required... :{P"  >> /tmp/kubectl.log
+    # echo "==============================================="  >> /tmp/kubectl.log
+    # echo "--No Context String--" >> /tmp/kubectl.log
+    # Assume the use of "kubectl"
+    # Gcloud is added to the path so that kubectl can find the "gke-gcloud-ath" plugin
+    export PATH=${gcloud_path}:${PATH}
+    ${gcloud_path}/kubectl $@
+    exit $?
+fi
+
+use_microk8s=`echo "$@" | grep ${microk8s_ctx}`
+use_gke=`echo "$@" | grep ${gke_ctx}`
+if [ ! -z "${use_microk8s}" ]; then
+    # echo "--microk8s--" >> /tmp/kubectl.log
+    /snap/bin/microk8s.kubectl $@
+    exit $?
+elif [ ! -z "${use_gke}" ]; then
+    # echo "--GKE--" >> /tmp/kubectl.log
+    export PATH=${gcloud_path}:${PATH}
+    ${gcloud_path}/kubectl $@
+    exit $?
+fi
+
+# echo "========================" >> /tmp/kubectl.log
